@@ -70,3 +70,43 @@ module Logic = struct
       cur = cur.value;
     }
 end
+
+let () =
+  let module Sim = Cyclesim.With_interface(Logic.I)(Logic.O) in
+  let sim = Sim.create Logic.create in
+  
+  let inputs = Cyclesim.inputs sim in
+  let outputs = Cyclesim.outputs sim in
+
+  (* reset *)
+  inputs.clear := Bits.vdd;
+  Cyclesim.cycle sim;
+  inputs.clear := Bits.gnd;
+
+  let puzzle_input = In_channel.read_all "input.txt" in
+  let rotations = String.split_lines puzzle_input in
+
+  List.iter rotations ~f:(fun rtn ->
+    let rtn = String.strip rtn in
+    if not (String.is_empty rtn) then begin
+      (* extract the character representing direction and number of steps in that direction *)
+      let dir_char = String.get rtn 0 in
+      let n = String.drop_prefix rtn 1 |> Int.of_string in
+
+      inputs.enable := Bits.vdd;
+      inputs.direction := (if Char.equal dir_char 'L' then Bits.vdd else Bits.gnd);
+      inputs.n_steps := Bits.of_int_trunc ~width:12 n;
+
+      Cyclesim.cycle sim;
+
+      inputs.enable := Bits.gnd;
+    end
+  );
+
+  let final_answer = Bits.to_int64_trunc !(outputs.ans) in
+  Printf.printf "final answer: %Ld\n" final_answer;
+
+  if Int64.(final_answer = 7199L) then
+    print_endline "test status: passed"
+  else
+    print_endline "test status: failed"
